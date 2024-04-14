@@ -27,14 +27,19 @@ public class PlayerController : MonoBehaviour
         if (ShouldFlip(movementDirection)) Flip();
         if (movementDirection != 0 && IsGrounded())
             _animator.SetTrigger("walk");
-        else _animator.SetTrigger("idle");
+        else if (IsGrounded())
+            _animator.SetTrigger("idle");
+        else
+            _animator.SetTrigger("jump");
 
-        Jump(); 
+        Jump();
     }
 
     private void FixedUpdate()
     {
         Move();
+        ChangeFriction();
+
     }
 
     private void OnDrawGizmos()
@@ -65,13 +70,30 @@ public class PlayerController : MonoBehaviour
     {
         return (horizontalMovement > 0 && IsFacingLeft()) || (horizontalMovement < 0 && !IsFacingLeft());
     }
+
     private bool IsFacingLeft()
     {
-        return transform.localScale.x < 0; 
+        return transform.localScale.x < 0;
     }
 
     private void Flip()
     {
         transform.localScale = new Vector3(transform.localScale.x * -1, transform.localScale.y, transform.localScale.z);
+    }
+
+    private void ChangeFriction()
+    {
+        var material = new PhysicsMaterial2D();
+        material.friction = 0.4f;
+        if (IsFacingTheWall()) material.friction = 0;
+        _rb.sharedMaterial = material;
+    }
+
+    private bool IsFacingTheWall()
+    {
+        Vector2 startPos = transform.position;
+        var endPos = IsFacingLeft() ? startPos + Vector2.left : startPos + Vector2.right;
+        var hit = Physics2D.Linecast(startPos, endPos, whatIsGround);
+        return hit.collider != null;
     }
 }
