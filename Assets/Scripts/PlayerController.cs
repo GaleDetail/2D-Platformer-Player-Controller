@@ -2,11 +2,17 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    private const float GroundFriction = 0.2f;
+    private const float WallFriction = 0;
     [SerializeField] private float moveSpeed;
     [SerializeField] private float jumpForce;
 
+
     public LayerMask whatIsGround;
     public Transform groundCheck;
+    public Transform wallCheckUp;
+    public Transform wallCheckDown;
+
     [SerializeField] private float groundCheckRadius;
 
     private Animator _animator;
@@ -16,36 +22,46 @@ public class PlayerController : MonoBehaviour
     {
         _rb = GetComponent<Rigidbody2D>();
         _animator = GetComponent<Animator>();
-        moveSpeed = 5;
+        moveSpeed = 3;
         jumpForce = 20;
         groundCheckRadius = 0.2f;
     }
 
     private void Update()
     {
-        var movementDirection = Input.GetAxisRaw("Horizontal");
-        if (ShouldFlip(movementDirection)) Flip();
-        if (movementDirection != 0 && IsGrounded())
-            _animator.SetTrigger("walk");
-        else if (IsGrounded())
-            _animator.SetTrigger("idle");
-        else
-            _animator.SetTrigger("jump");
-
+        ChangeAnimation();
+        ChangeFriction();
         Jump();
     }
 
     private void FixedUpdate()
     {
         Move();
-        ChangeFriction();
-
     }
 
     private void OnDrawGizmos()
     {
         Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
+        Gizmos.DrawLine(wallCheckUp.position,
+            new Vector3(wallCheckUp.position.x + 0.5f, wallCheckUp.position.y, wallCheckUp.position.z));
     }
+
+    private void ChangeAnimation()
+    {
+        var movementDirection = Input.GetAxisRaw("Horizontal");
+
+        if (ShouldFlip(movementDirection)) Flip();
+
+        if (IsFacingTheWall() && _rb.velocity.y < 0)
+            _animator.SetTrigger("wallSlide");
+        else if (movementDirection != 0 && IsGrounded())
+            _animator.SetTrigger("walk");
+        else if (IsGrounded())
+            _animator.SetTrigger("idle");
+        else
+            _animator.SetTrigger("jump");
+    }
+
 
     private void Move()
     {
@@ -84,16 +100,37 @@ public class PlayerController : MonoBehaviour
     private void ChangeFriction()
     {
         var material = new PhysicsMaterial2D();
-        material.friction = 0.4f;
-        if (IsFacingTheWall()) material.friction = 0;
+        material.friction = GroundFriction;
+        if (IsFacingTheWall()) material.friction = WallFriction;
         _rb.sharedMaterial = material;
     }
 
     private bool IsFacingTheWall()
     {
-        Vector2 startPos = transform.position;
+        Vector2 startPos = wallCheckUp.position;
+        // FlipRayCast(startPos);
+        var distance = 0.4f;
         var endPos = IsFacingLeft() ? startPos + Vector2.left : startPos + Vector2.right;
-        var hit = Physics2D.Linecast(startPos, endPos, whatIsGround);
+        var hit = Physics2D.Raycast(startPos, endPos, distance, whatIsGround);
+    
+        Vector2 startPos2 = wallCheckDown.position;
+    
+        var endPos2 = IsFacingLeft() ? startPos2 + Vector2.left : startPos2 + Vector2.right;
+        var hit2 = Physics2D.Raycast(startPos2, endPos2, distance, whatIsGround);
+    
+        return hit.collider != null || hit2.collider != null;
+    }
+
+    // private bool IsFacingTheWall()
+    // {
+    //     return HittedTheWall(wallCheckUp.position) || HittedTheWall(wallCheckDown.position);
+    // }
+
+    private bool HittedTheWall(Vector2 startPosition)
+    {
+        var distanceToWall = 0.1f;
+        var endPos = IsFacingLeft() ? startPosition + Vector2.left : startPosition + Vector2.right;
+        var hit = Physics2D.Raycast(startPosition, endPos, distanceToWall, whatIsGround);
         return hit.collider != null;
     }
 }
